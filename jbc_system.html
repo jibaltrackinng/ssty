@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النظام الشامل لإدارة شركة جبال البصرة للشحن (JBC)</title>
+    <!-- مكتبة لطباعة وتصدير ملفات الـ PDF والفواتير -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #0b2545;
+            --secondary: #134074;
+            --accent: #0077b6;
+            --bg: #f4f7f6;
+            --white: #ffffff;
+            --danger: #d90429;
+            --success: #2b9348;
+            --warning: #f77f00;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: var(--primary);
+            color: var(--white);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-badge {
+            background: var(--accent);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .card {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+            border-top: 5px solid var(--accent);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 20px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 12px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--secondary);
+        }
+        input, select {
+            padding: 11px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 5px rgba(0,119,182,0.2);
+        }
+        button {
+            padding: 11px 22px;
+            background-color: var(--accent);
+            color: var(--white);
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #005f73; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        th, td {
+            padding: 12px 10px;
+            text-align: right;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th { background-color: #f1f5f9; color: var(--primary); }
+        tr:hover { background-color: #f8f9fa; }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .s-created { background: #e2e8f0; color: #1e293b; }
+        .s-recv { background: #e0f2fe; color: #0369a1; }
+        .s-shipped { background: #fef3c7; color: #b45309; }
+        .s-arrived { background: #f3e8ff; color: #6b21a8; }
+        .s-delivered { background: #dcfce7; color: #166534; }
+        
+        .btn-action { padding: 6px 12px; font-size: 12px; margin-left: 5px; margin-bottom: 4px; }
+        .btn-danger { background-color: var(--danger); }
+        .btn-danger:hover { background-color: #a71d2a; }
+        .btn-success { background-color: var(--success); }
+        .btn-success:hover { background-color: #217338; }
+        .btn-warning { background-color: var(--warning); color: #fff; }
+        .btn-warning:hover { background-color: #d97706; }
+
+        /* تصميم الفاتورة الرسمية */
+        #invoiceModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .invoice-box {
+            background: white;
+            width: 700px;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-box">
+            <div class="logo-badge">JBC</div>
+            <div>
+                <h1 style="margin:0; font-size:18px;">شركة جبال البصرة للشحن الدولي والخدمات اللوجستية</h1>
+                <small>البصرة - الجزائر | هاتف/واتساب: 07885001004</small>
+            </div>
+        </div>
+        <div>
+            <span>🌐 نظام الإدارة السحابي المتكامل</span>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- 1. إدارة العملاء -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 12px; margin-bottom: 15px;">
+                <h3 style="margin:0; border:none; padding:0;">👥 1. إدارة العملاء وتوليد الأكواد التلقائي (مثال: j0060)</h3>
+                <!-- خانة البحث السريع المدمجة للعملاء بدون زحمة -->
+                <input type="text" id="clientSearchInput" onkeyup="filterClients()" placeholder="🔍 بحث سريع عن عميل أو كود..." style="padding: 6px 12px; font-size: 13px; width: 250px;">
+            </div>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>كود العميل (تلقائي / قابل للتعديل):</label>
+                    <input type="text" id="clientCode">
+                </div>
+                <div class="form-group">
+                    <label>اسم العميل / الشركة:</label>
+                    <input type="text" id="clientName" placeholder="اسم العميل...">
+                </div>
+                <div class="form-group">
+                    <label>رقم الهاتف:</label>
+                    <input type="text" id="clientPhone" placeholder="الهاتف...">
+                </div>
+                <div class="form-group">
+                    <label>عنوان العميل:</label>
+                    <input type="text" id="clientAddress" placeholder="العنوان...">
+                </div>
+            </div>
+            <button onclick="addClient()">حفظ وإضافة العميل</button>
+
+            <!-- قائمة مصغرة لنتائج بحث العملاء السريع لعدم ملء الشاشة -->
+            <div id="clientQuickResults" style="margin-top: 15px; font-size: 13px; color: var(--secondary); max-height: 100px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- 2 & 3. معلومات الشحنة وإدارتها -->
+        <div class="card">
+            <h3>📦 2 & 3. إصدار شحنة جديدة ومتابعة مراحلها</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>رقم الشحنة (تلقائي / قابل للتعديل):</label>
+                    <input type="text" id="shipRef">
+                </div>
+                <div class="form-group">
+                    <label>اختر العميل:</label>
+                    <select id="shipClient"></select>
+                </div>
+                <div class="form-group">
+                    <label>طريقة الشحن:</label>
+                    <select id="shipMethod">
+                        <option value="شحن بحري">شحن بحري</option>
+                        <option value="شحن جوي">شحن جوي</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>الوجهة:</label>
+                    <select id="shipDestination">
+                        <option value="الصين">الصين</option>
+                        <option value="الامارات">الامارات</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>اسم المخزن المستلم:</label>
+                    <input type="text" id="shipWarehouse" placeholder="مثلاً: مخزن غوانغجو / دبي">
+                </div>
+                <div class="form-group">
+                    <label>حجم الشحنة (CBM):</label>
+                    <input type="number" step="0.01" id="shipCbm" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label>وزن الشحنة (KG):</label>
+                    <input type="number" step="0.1" id="shipKg" placeholder="0.0">
+                </div>
+                <div class="form-group">
+                    <label>تاريخ استلام الشحنة (الفعلي):</label>
+                    <input type="date" id="shipReceiveDate">
+                </div>
+                <div class="form-group">
+                    <label>تكلفة الشحنة علينا:</label>
+                    <input type="number" id="shipCost" placeholder="التكلفة...">
+                </div>
+                <div class="form-group">
+                    <label>سعر البيع للعميل:</label>
+                    <input type="number" id="shipPrice" placeholder="سعر البيع...">
+                </div>
+                <div class="form-group">
+                    <label>العملة:</label>
+                    <select id="shipCurrency">
+                        <option value="USD">دولار أمريكي ($)</option>
+                        <option value="IQD">دينار عراقي (د.ع)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>المرحلة الحالية للشحنة:</label>
+                    <select id="shipStatus">
+                        <option value="تم الانشاء">1 - تم الانشاء</option>
+                        <option value="تم الاستلام في المخازن">2 - تم الاستلام في المخازن</option>
+                        <option value="في طور الشحن">3 - في طور الشحن</option>
+                        <option value="وصلت الى الوجهة">4 - وصلت الى الوجهة</option>
+                        <option value="تم التسليم الى العميل">5 - تم التسليم الى العميل</option>
+                    </select>
+                </div>
+            </div>
+            <!-- زر الحفظ -->
+            <button onclick="addShipment()">حفظ وإصدار الشحنة</button>
+        </div>
+
+        <!-- جداول العرض والتقارير -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 12px; margin-bottom: 15px;">
+                <h3 style="margin:0; border:none; padding:0;">📋 سجل الشحنات والتحكم بالمراحل (آخر 3 شحنات)</h3>
+                <button id="toggleTableBtn" onclick="toggleFullTable()" style="background-color: var(--secondary); font-size: 12px; padding: 6px 14px;">عرض كافة الشحنات (السجل الكامل)</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>رقم الشحنة</th>
+                        <th>العميل والكود</th>
+                        <th>المخزن وطريقة الشحن</th>
+                        <th>الحجم والوزن</th>
+                        <th>تاريخ الاستلام / الوصول</th>
+                        <th>الحالة الحالية</th>
+                        <th>الإجراءات والفواتير</th>
+                    </tr>
+                </thead>
+                <tbody id="masterTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 5. التقارير المالية للشركة -->
+        <div class="card">
+            <h3>📊 5. التقارير المالية للشركات (حسب المخازن والأرباح)</h3>
+            <div id="warehouseReports" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;"></div>
+        </div>
+
+    </div>
+
+    <!-- نافذة الفاتورة الرسمية للعميل -->
+    <div id="invoiceModal">
+        <div class="invoice-box" id="printableInvoice">
+            <div class="invoice-header">
+                <div>
+                    <h2 style="margin:0; color:#0b2545;">شركة جبال البصرة للشحن الدولي</h2>
+                    <p style="margin:5px 0; font-size:13px; color:#555;">البصرة - الجزائر | هاتف: 07885001004</p>
+                </div>
+                <div style="text-align: left;">
+                    <h3 style="margin:0; color:#0077b6;">فاتورة شحن رسمية</h3>
+                    <p id="invDate" style="margin:5px 0; font-size:13px;"></p>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <strong>معلومات العميل:</strong>
+                <p id="invClientInfo" style="margin:5px 0;"></p>
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+                <thead>
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding:8px; border:1px solid #ddd;">رقم الشحنة</th>
+                        <th style="padding:8px; border:1px solid #ddd;">طريقة الشحن والمخزن</th>
+                        <th style="padding:8px; border:1px solid #ddd;">الحجم والوزن</th>
+                        <th style="padding:8px; border:1px solid #ddd;">المبلغ الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="invRef" style="padding:8px; border:1px solid #ddd; text-align:center;"></td>
+                        <td id="invMethod" style="padding:8px; border:1px solid #ddd; text-align:center;"></td>
+                        <td id="invSize" style="padding:8px; border:1px solid #ddd; text-align:center;"></td>
+                        <td id="invPrice" style="padding:8px; border:1px solid #ddd; text-align:center; font-weight:bold;"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="text-align:center; margin-top:30px;">
+                <p style="font-size:12px; color:#777;">شكراً لتعاملكم مع شركة جبال البصرة (JBC). نتمنى لكم دائماً أفضل الخدمات.</p>
+            </div>
+        </div>
+        <div style="position: absolute; bottom: 20px; display: flex; gap: 10px;">
+            <button onclick="downloadPDF()" class="btn-success">تحميل الفاتورة PDF</button>
+            <button onclick="closeInvoice()" class="btn-danger">إغلاق</button>
+        </div>
+    </div>
+
+    <script>
+        // رابط كوكل سكريبت السحابي
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnkASvAbBgkvtqrymuljfCjJCMkArDbJ9IWyx1lf4A7yM-86qoglYoeDtcsTDyH1T5OQ/exec";
+
+        let clients = JSON.parse(localStorage.getItem('jbc_clients')) || [];
+        let shipments = JSON.parse(localStorage.getItem('jbc_shipments')) || [];
+        let showAllShipments = false; // متغير للتحكم بعرض كافة الشحنات أو آخر 3 فقط
+
+        function generateClientCode() {
+            if (clients.length === 0) return "j0060";
+            let lastCode = clients[clients.length - 1].code;
+            let num = parseInt(lastCode.replace(/\D/g, '')) + 1;
+            return "j" + String(num).padStart(4, '0');
+        }
+
+        function generateShipRef() {
+            if (shipments.length === 0) return "jbal600";
+            let lastRef = shipments[shipments.length - 1].ref;
+            let num = parseInt(lastRef.replace(/\D/g, '')) + 1;
+            return "jbal" + num;
+        }
+
+        function getFormattedToday() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        window.onload = function() {
+            document.getElementById('clientCode').value = generateClientCode();
+            document.getElementById('shipRef').value = generateShipRef();
+            document.getElementById('shipReceiveDate').value = getFormattedToday();
+            renderAll();
+        };
+
+        async function syncToGoogleSheets(type, data) {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("YOUR_URL")) return;
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: type, data: data })
+                });
+            } catch (error) {
+                console.error("خطأ في المزامنة السحابية:", error);
+            }
+        }
+
+        function addClient() {
+            const code = document.getElementById('clientCode').value.trim();
+            const name = document.getElementById('clientName').value.trim();
+            const phone = document.getElementById('clientPhone').value.trim();
+            const address = document.getElementById('clientAddress').value.trim();
+
+            if (!code || !name) {
+                alert("الرجاء إدخال كود العميل واسمه.");
+                return;
+            }
+
+            const newClient = { code, name, phone, address };
+            clients.push(newClient);
+            localStorage.setItem('jbc_clients', JSON.stringify(clients));
+
+            syncToGoogleSheets('client', newClient);
+
+            document.getElementById('clientName').value = '';
+            document.getElementById('clientPhone').value = '';
+            document.getElementById('clientAddress').value = '';
+            document.getElementById('clientCode').value = generateClientCode();
+
+            renderAll();
+            alert("تم حفظ العميل بنجاح ومزامنته!");
+        }
+
+        // دالة البحث السريع عن العملاء بدون زحمة
+        function filterClients() {
+            let query = document.getElementById('clientSearchInput').value.trim().toLowerCase();
+            let resultsBox = document.getElementById('clientQuickResults');
+            resultsBox.innerHTML = '';
+
+            if (!query) return;
+
+            let matches = clients.filter(c => c.name.toLowerCase().includes(query) || c.code.toLowerCase().includes(query) || (c.phone && c.phone.includes(query)));
+
+            if (matches.length === 0) {
+                resultsBox.innerHTML = '<span style="color: red;">لم يتم العثور على عميل مطابقة.</span>';
+                return;
+            }
+
+            matches.forEach(c => {
+                resultsBox.innerHTML += `<div style="background: #fff; padding: 5px 10px; margin-bottom: 3px; border-radius: 4px; border: 1px solid #ddd;">
+                    <strong>${c.name}</strong> (${c.code}) - هاتف: ${c.phone || '-'} - عنوان: ${c.address || '-'}
+                </div>`;
+            });
+        }
+
+        function addShipment() {
+            const ref = document.getElementById('shipRef').value.trim();
+            const clientCode = document.getElementById('shipClient').value;
+            const method = document.getElementById('shipMethod').value;
+            const destination = document.getElementById('shipDestination').value;
+            const warehouse = document.getElementById('shipWarehouse').value.trim() || 'المخزن الرئيسي';
+            const cbm = parseFloat(document.getElementById('shipCbm').value) || 0;
+            const kg = parseFloat(document.getElementById('shipKg').value) || 0;
+            const receiveDate = document.getElementById('shipReceiveDate').value || getFormattedToday();
+            const cost = parseFloat(document.getElementById('shipCost').value) || 0;
+            const price = parseFloat(document.getElementById('shipPrice').value) || 0;
+            const currency = document.getElementById('shipCurrency').value;
+            const status = document.getElementById('shipStatus').value;
+            const expectedArrivalDate = ''; // القيمة الافتراضية عند الإنشاء
+
+            if (!ref || !clientCode) {
+                alert("الرجاء إدخال رقم الشحنة واختيار العميل.");
+                return;
+            }
+
+            const newShipment = { ref, clientCode, method, destination, warehouse, cbm, kg, receiveDate, cost, price, currency, status, expectedArrivalDate };
+            shipments.push(newShipment);
+            localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
+
+            syncToGoogleSheets('shipment', newShipment);
+
+            document.getElementById('shipRef').value = generateShipRef();
+            document.getElementById('shipReceiveDate').value = getFormattedToday();
+            document.getElementById('shipCbm').value = '';
+            document.getElementById('shipKg').value = '';
+            document.getElementById('shipCost').value = '';
+            document.getElementById('shipPrice').value = '';
+
+            renderAll();
+            alert("تم إصدار الشحنة بنجاح ومزامنها!");
+        }
+        
+        async function updateStatus(index, newStatus) {
+            let expectedArrival = shipments[index].expectedArrivalDate || '';
+
+            // إذا تم تغيير الحالة إلى "في طور الشحن"، نطلب من المستخدم إدخال التاريخ المتوقع للوصول
+            if (newStatus === "في طور الشحن") {
+                let userInput = prompt("أدخل التاريخ المتوقع للوصول (YYYY-MM-DD):", expectedArrival || getFormattedToday());
+                if (userInput !== null) {
+                    expectedArrival = userInput.trim();
+                }
+            }
+
+            shipments[index].status = newStatus;
+            shipments[index].expectedArrivalDate = expectedArrival;
+            localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
+            
+            let shipmentRef = shipments[index].ref;
+            await syncToGoogleSheets('updateStatus', { ref: shipmentRef, status: newStatus, expectedArrivalDate: expectedArrival });
+            
+            renderAll();
+        }
+
+        // دالة تعديل الشحنة المتكاملة
+        async function editShipment(index) {
+            let s = shipments[index];
+
+            let newRef = prompt("تعديل رقم الشحنة:", s.ref);
+            if (newRef === null) return;
+
+            let newMethod = prompt("تعديل طريقة الشحن (شحن بحري / شحن جوي):", s.method);
+            if (newMethod === null) return;
+
+            let newDestination = prompt("تعديل الوجهة (الصين / الامارات):", s.destination);
+            if (newDestination === null) return;
+
+            let newWarehouse = prompt("تعديل اسم المخزن المستلم:", s.warehouse);
+            if (newWarehouse === null) return;
+
+            let newCbm = prompt("تعديل حجم الشحنة (CBM):", s.cbm);
+            if (newCbm === null) return;
+
+            let newKg = prompt("تعديل وزن الشحنة (KG):", s.kg);
+            if (newKg === null) return;
+
+            let newReceiveDate = prompt("تعديل تاريخ الاستلام (YYYY-MM-DD):", s.receiveDate || getFormattedToday());
+            if (newReceiveDate === null) return;
+
+            let newExpectedArrival = prompt("تعديل التاريخ المتوقع للوصول (YYYY-MM-DD):", s.expectedArrivalDate || '');
+            if (newExpectedArrival === null) return;
+
+            let newCost = prompt("تعديل تكلفة الشحنة علينا:", s.cost);
+            if (newCost === null) return;
+
+            let newPrice = prompt("تعديل سعر البيع للعميل:", s.price);
+            if (newPrice === null) return;
+
+            // تحديث البيانات محلياً
+            shipments[index].ref = newRef.trim() || s.ref;
+            shipments[index].method = newMethod.trim() || s.method;
+            shipments[index].destination = newDestination.trim() || s.destination;
+            shipments[index].warehouse = newWarehouse.trim() || s.warehouse;
+            shipments[index].cbm = parseFloat(newCbm) || s.cbm;
+            shipments[index].kg = parseFloat(newKg) || s.kg;
+            shipments[index].receiveDate = newReceiveDate.trim() || s.receiveDate;
+            shipments[index].expectedArrivalDate = newExpectedArrival.trim() || s.expectedArrivalDate;
+            shipments[index].cost = parseFloat(newCost) || s.cost;
+            shipments[index].price = parseFloat(newPrice) || s.price;
+
+            localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
+
+            // مزامنة التعديل مع كوكل شيت
+            await syncToGoogleSheets('updateShipment', shipments[index]);
+
+            renderAll();
+            alert("✅ تم تعديل الشحنة بنجاح ومزامنته مع النظام وملفات كوكل شيت!");
+        }
+
+        function deleteShipment(index) {
+            if (confirm("هل أنت متأكد من حذف هذه الشحنة؟")) {
+                let deletedRef = shipments[index].ref;
+                shipments.splice(index, 1);
+                localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
+                
+                syncToGoogleSheets('deleteShipment', { ref: deletedRef });
+
+                renderAll();
+            }
+        }
+
+        function openInvoice(index) {
+            let s = shipments[index];
+            let client = clients.find(c => c.code === s.clientCode) || { name: 'عميل عام', phone: '-', address: '-' };
+
+            if (s.status !== "تم التسليم الى العميل") {
+                alert("عذراً، لا يمكن إصدار الفاتورة الرسمية إلا بعد وصول الشحنة إلى مرحلة (تم التسليم الى العميل).");
+                return;
+            }
+
+            document.getElementById('invDate').innerText = "التاريخ: " + new Date().toLocaleDateString();
+            document.getElementById('invClientInfo').innerHTML = `الاسم: <strong>${client.name}</strong> (${client.code})<br>الهاتف: ${client.phone}<br>العنوان: ${client.address}`;
+            document.getElementById('invRef').innerText = s.ref;
+            document.getElementById('invMethod').innerText = s.method + " - " + s.destination + " (" + s.warehouse + ")";
+            document.getElementById('invSize').innerText = s.cbm + " CBM / " + s.kg + " KG";
+            document.getElementById('invPrice').innerText = s.price.toLocaleString() + " " + s.currency;
+
+            document.getElementById('invoiceModal').style.display = 'flex';
+        }
+
+        function closeInvoice() {
+            document.getElementById('invoiceModal').style.display = 'none';
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('printableInvoice');
+            html2pdf().from(element).save('JBC-Invoice.pdf');
+        }
+
+        function toggleFullTable() {
+            showAllShipments = !showAllShipments;
+            let btn = document.getElementById('toggleTableBtn');
+            if (showAllShipments) {
+                btn.innerText = "عرض آخر 3 شحنات فقط";
+                btn.style.backgroundColor = "var(--danger)";
+            } else {
+                btn.innerText = "عرض كافة الشحنات (السجل الكامل)";
+                btn.style.backgroundColor = "var(--secondary)";
+            }
+            renderAll();
+        }
+
+        function renderAll() {
+            const clientSelect = document.getElementById('shipClient');
+            clientSelect.innerHTML = '';
+            if (clients.length === 0) {
+                clientSelect.innerHTML = '<option value="">(الرجاء إضافة عميل أولاً)</option>';
+            } else {
+                clients.forEach(c => {
+                    clientSelect.innerHTML += `<option value="${c.code}">${c.name} (${c.code})</option>`;
+                });
+            }
+
+            const tbody = document.getElementById('masterTableBody');
+            tbody.innerHTML = '';
+            
+            let warehouseStats = {};
+
+            // تحديد الشحنات المعروضة (آخر 3 أو الكل حسب اختيار المستخدم)
+            let displayedShipments = showAllShipments ? [...shipments].reverse() : [...shipments].reverse().slice(0, 3);
+
+            displayedShipments.forEach((s) => {
+                // البحث عن الفهرس الحقيقي للشحنة في المصفوفة الأصلية
+                let index = shipments.indexOf(s);
+                let client = clients.find(c => c.code === s.clientCode) || { name: 'غير معروف' };
+                
+                if (!warehouseStats[s.warehouse]) {
+                    warehouseStats[s.warehouse] = { totalCost: 0, totalPrice: 0, count: 0 };
+                }
+                warehouseStats[s.warehouse].totalCost += s.cost;
+                warehouseStats[s.warehouse].totalPrice += s.price;
+                warehouseStats[s.warehouse].count += 1;
+
+                let badgeClass = 's-created';
+                if (s.status === 'تم الاستلام في المخازن') badgeClass = 's-recv';
+                else if (s.status === 'في طور الشحن') badgeClass = 's-shipped';
+                else if (s.status === 'وصلت الى الوجهة') badgeClass = 's-arrived';
+                else if (s.status === 'تم التسليم الى العميل') badgeClass = 's-delivered';
+
+                // إظهار التاريخ المتوقع للوصول ضمن خانة الجدول إن وجد
+                let arrivalInfo = s.expectedArrivalDate ? `<br><small style="color:var(--danger)">الوصول المتوقع: ${s.expectedArrivalDate}</small>` : '';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${s.ref}</strong></td>
+                        <td>${client.name}<br><small style="color:var(--accent)">${s.clientCode}</small></td>
+                        <td>${s.method} (${s.destination || 'غير محدد'})<br><small>مخزن: ${s.warehouse}</small></td>
+                        <td>${s.cbm} CBM<br>${s.kg} KG</td>
+                        <td>استلام: ${s.receiveDate || '-'}${arrivalInfo}</td>
+                        <td>
+                            <select class="status-badge ${badgeClass}" onchange="updateStatus(${index}, this.value)">
+                                <option value="تم الانشاء" ${s.status==='تم الانشاء'?'selected':''}>1 - تم الانشاء</option>
+                                <option value="تم الاستلام في المخازن" ${s.status==='تم الاستلام في المخازن'?'selected':''}>2 - تم الاستلام في المخازن</option>
+                                <option value="في طور الشحن" ${s.status==='في طور الشحن'?'selected':''}>3 - في طور الشحن</option>
+                                <option value="وصلت الى الوجهة" ${s.status==='وصلت الى الوجهة'?'selected':''}>4 - وصلت الى الوجهة</option>
+                                <option value="تم التسليم الى العميل" ${s.status==='تم التسليم الى العميل'?'selected':''}>5 - تم التسليم الى العميل</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn-action btn-success" onclick="openInvoice(${index})">فاتورة PDF</button>
+                            <!-- زر تعديل الشحنة -->
+                            <button class="btn-action btn-warning" onclick="editShipment(${index})">تعديل الشحنة</button>
+                            <!-- زر الحذف -->
+                            <button class="btn-action btn-danger" onclick="deleteShipment(${index})">حذف الشحنة</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            const whContainer = document.getElementById('warehouseReports');
+            whContainer.innerHTML = '';
+            if (Object.keys(warehouseStats).length === 0) {
+                whContainer.innerHTML = '<p style="color:#777;">لا توجد شحنات مسجلة بعد لعرض التقارير المالية للمخازن.</p>';
+            } else {
+                for (let wh in warehouseStats) {
+                    let st = warehouseStats[wh];
+                    let profit = st.totalPrice - st.totalCost;
+                    whContainer.innerHTML += `
+                        <div style="background:#f8f9fa; padding:15px; border-radius:8px; border-left:4px solid var(--primary);">
+                            <h4 style="margin:0 0 10px 0; color:var(--primary);">مخزن: ${wh}</h4>
+                            <p style="margin:5px 0; font-size:13px;">عدد الشحنات: <strong>${st.count}</strong></p>
+                            <p style="margin:5px 0; font-size:13px;">إجمالي التكلفة: ${st.totalCost.toLocaleString()}</p>
+                            <p style="margin:5px 0; font-size:13px;">إجمالي البيع: ${st.totalPrice.toLocaleString()}</p>
+                            <p style="margin:5px 0; font-size:14px; color:var(--success);"><strong>صافي الربح: ${profit.toLocaleString()}</strong></p>
+                        </div>
+                    `;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
