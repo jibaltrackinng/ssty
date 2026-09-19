@@ -139,16 +139,7 @@
         .btn-warning { background-color: var(--warning); color: #fff; }
         .btn-warning:hover { background-color: #d97706; }
 
-        /* تصميم الفاتورة الرسمية */
-        #invoiceModal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
+        /* تصميم الفواتير والبطاقات القابلة للطباعة */
         .invoice-box {
             background: white;
             width: 700px;
@@ -164,10 +155,56 @@
             padding-bottom: 20px;
             margin-bottom: 20px;
         }
+        /* تنسيق أزرار النافذة المنبثقة لكشف الحساب لتكون واضحة وثابتة */
+        .modal-footer-custom, .statement-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            margin-top: 20px;
+            border-radius: 0 0 10px 10px;
+        }
+        .modal-footer-custom button, .statement-actions button {
+            padding: 10px 25px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* أسلوب الطباعة: يعزل فاتورة/كشف حساب العميل فقط عند الطباعة أو الحفظ كـ PDF من نافذة الطباعة،
+           ويُخفي كل شيء آخر في الصفحة (الهيدر، النماذج، الأزرار...الخ) */
+        @media print {
+            body * { visibility: hidden; }
+            #printableClientInvoice, #printableClientInvoice * { visibility: visible; }
+            #printableClientInvoice {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                box-shadow: none;
+                margin: 0;
+            }
+        }
     </style>
 </head>
 <body>
 
+    <!-- شاشة تسجيل الدخول (حماية بكلمة مرور) -->
+    <div id="loginOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--primary); display:flex; justify-content:center; align-items:center; z-index:5000;">
+        <div style="background:var(--white); padding:40px 35px; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,0.4); width:100%; max-width:360px; text-align:center; box-sizing:border-box;">
+            <div class="logo-badge" style="display:inline-block; margin-bottom:15px;">JBC</div>
+            <h3 style="margin:0 0 20px 0; color:var(--primary);">تسجيل الدخول إلى النظام</h3>
+            <input type="password" id="loginPasswordInput" placeholder="أدخل الرمز السري..." style="width:100%; box-sizing:border-box; margin-bottom:12px;" onkeydown="if(event.key==='Enter') checkLogin()">
+            <button onclick="checkLogin()" style="width:100%;">دخول</button>
+            <p id="loginError" style="color:var(--danger); font-size:13px; margin-top:12px; display:none;">❌ الرمز السري غير صحيح، حاول مرة أخرى.</p>
+        </div>
+    </div>
+
+    <div id="appContent" style="display:none;">
     <header>
         <div class="logo-box">
             <div class="logo-badge">JBC</div>
@@ -176,8 +213,9 @@
                 <small>البصرة - الجزائر | هاتف/واتساب: 07885001004</small>
             </div>
         </div>
-        <div>
+        <div style="display:flex; align-items:center; gap:15px;">
             <span>🌐 نظام الإدارة السحابي المتكامل</span>
+            <button onclick="logout()" class="btn-danger" style="font-size:12px; padding:6px 14px;">🔒 تسجيل الخروج</button>
         </div>
     </header>
 
@@ -210,6 +248,7 @@
                 </div>
             </div>
             <button onclick="addClient()">حفظ وإضافة العميل</button>
+            <button type="button" onclick="testGoogleSheetSync()" class="btn-warning" style="margin-right:8px;">🔄 اختبار الاتصال بكوكل شيت</button>
 
             <!-- قائمة مصغرة لنتائج بحث العملاء السريع لعدم ملء الشاشة -->
             <div id="clientQuickResults" style="margin-top: 15px; font-size: 13px; color: var(--secondary); max-height: 100px; overflow-y: auto;"></div>
@@ -220,19 +259,19 @@
             <h3>📦 2 & 3. إصدار شحنة جديدة ومتابعة مراحلها</h3>
             <div class="form-grid">
                 <div class="form-group">
-                    <label>رقم الشحنة (تلقائي / قابل للتعديل):</label>
+                    <label>طريقة الشحن:</label>
+                    <select id="shipMethod" onchange="document.getElementById('shipRef').value = generateShipRef(this.value)">
+                        <option value="شحن بحري">شحن بحري</option>
+                        <option value="شحن جوي">شحن جوي</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>كود الشحنة (تلقائي حسب نوع الشحن / قابل للتعديل):</label>
                     <input type="text" id="shipRef">
                 </div>
                 <div class="form-group">
                     <label>اختر العميل:</label>
                     <select id="shipClient"></select>
-                </div>
-                <div class="form-group">
-                    <label>طريقة الشحن:</label>
-                    <select id="shipMethod">
-                        <option value="شحن بحري">شحن بحري</option>
-                        <option value="شحن جوي">شحن جوي</option>
-                    </select>
                 </div>
                 <div class="form-group">
                     <label>الوجهة:</label>
@@ -254,6 +293,10 @@
                     <input type="number" step="0.1" id="shipKg" placeholder="0.0">
                 </div>
                 <div class="form-group">
+                    <label>عدد المغلفات (CTN):</label>
+                    <input type="number" step="1" id="shipCtn" placeholder="0">
+                </div>
+                <div class="form-group">
                     <label>تاريخ استلام الشحنة (الفعلي):</label>
                     <input type="date" id="shipReceiveDate">
                 </div>
@@ -270,16 +313,6 @@
                     <select id="shipCurrency">
                         <option value="USD">دولار أمريكي ($)</option>
                         <option value="IQD">دينار عراقي (د.ع)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>المرحلة الحالية للشحنة:</label>
-                    <select id="shipStatus">
-                        <option value="تم الانشاء">1 - تم الانشاء</option>
-                        <option value="تم الاستلام في المخازن">2 - تم الاستلام في المخازن</option>
-                        <option value="في طور الشحن">3 - في طور الشحن</option>
-                        <option value="وصلت الى الوجهة">4 - وصلت الى الوجهة</option>
-                        <option value="تم التسليم الى العميل">5 - تم التسليم الى العميل</option>
                     </select>
                 </div>
             </div>
@@ -315,56 +348,116 @@
             <div id="warehouseReports" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;"></div>
         </div>
 
-    </div>
+        <!-- 6. كشف حساب العملاء (نسخة مصغرة: اختيار عميل ثم كشف حساب) -->
+        <div class="card">
+            <h3>🧾 6. كشف حساب العملاء</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>اختر العميل:</label>
+                    <select id="reportClientSelect"></select>
+                </div>
+            </div>
+            <button onclick="openClientInvoice(document.getElementById('reportClientSelect').value)">📄 كشف حساب</button>
+        </div>
 
-    <!-- نافذة الفاتورة الرسمية للعميل -->
-    <div id="invoiceModal">
-        <div class="invoice-box" id="printableInvoice">
-            <div class="invoice-header">
-                <div>
-                    <h2 style="margin:0; color:#0b2545;">شركة جبال البصرة للشحن الدولي</h2>
-                    <p style="margin:5px 0; font-size:13px; color:#555;">البصرة - الجزائر | هاتف: 07885001004</p>
-                </div>
-                <div style="text-align: left;">
-                    <h3 style="margin:0; color:#0077b6;">فاتورة شحن رسمية</h3>
-                    <p id="invDate" style="margin:5px 0; font-size:13px;"></p>
-                </div>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <strong>معلومات العميل:</strong>
-                <p id="invClientInfo" style="margin:5px 0;"></p>
-            </div>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-                <thead>
-                    <tr style="background:#f1f5f9;">
-                        <th style="padding:8px; border:1px solid #ddd;">رقم الشحنة</th>
-                        <th style="padding:8px; border:1px solid #ddd;">طريقة الشحن والمخزن</th>
-                        <th style="padding:8px; border:1px solid #ddd;">الحجم والوزن</th>
-                        <th style="padding:8px; border:1px solid #ddd;">المبلغ الإجمالي</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td id="invRef" style="padding:8px; border:1px solid #ddd; text-align:center;"></td>
-                        <td id="invMethod" style="padding:8px; border:1px solid #ddd; text-align:center;"></td>
-                        <td id="invSize" style="padding:8px; border:1px solid #ddd; text-align:center;"></td>
-                        <td id="invPrice" style="padding:8px; border:1px solid #ddd; text-align:center; font-weight:bold;"></td>
-                    </tr>
-                </tbody>
-            </table>
-            <div style="text-align:center; margin-top:30px;">
-                <p style="font-size:12px; color:#777;">شكراً لتعاملكم مع شركة جبال البصرة (JBC). نتمنى لكم دائماً أفضل الخدمات.</p>
+    </div>
+    </div><!-- إغلاق appContent -->
+
+    <!-- نافذة إصدار الشحنة (بطاقة المخزن/الكود) -->
+    <div id="slipModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;">
+        <div class="invoice-box" id="printableSlip" style="width:400px; text-align:center;">
+            <h2 style="margin:0 0 5px 0; color:var(--primary);">شركة جبال البصرة (JBC)</h2>
+            <p style="margin:0 0 20px 0; font-size:12px; color:#777;">بطاقة إصدار شحنة</p>
+            <div style="border: 2px dashed var(--accent); border-radius: 10px; padding: 30px 20px;">
+                <p style="font-size:13px; color:#777; margin:0 0 6px 0;">اسم المخزن</p>
+                <h3 id="slipWarehouse" style="margin:0 0 22px 0; color:var(--primary);"></h3>
+                <p style="font-size:13px; color:#777; margin:0 0 6px 0;">كود الشحنة</p>
+                <h1 id="slipRef" style="margin:0 0 22px 0; color:var(--accent); letter-spacing:1px;"></h1>
+                <hr style="border:none; border-top:1px dashed #ccc; margin:0 0 18px 0;">
+                <p style="font-size:13px; color:#777; margin:0 0 6px 0;">الكود المدمج (المخزن / كود الشحنة)</p>
+                <p id="slipCode" style="margin:0; font-size:17px; font-weight:bold; color:var(--secondary); word-break:break-all;"></p>
             </div>
         </div>
         <div style="position: absolute; bottom: 20px; display: flex; gap: 10px;">
-            <button onclick="downloadPDF()" class="btn-success">تحميل الفاتورة PDF</button>
-            <button onclick="closeInvoice()" class="btn-danger">إغلاق</button>
+            <button onclick="copySlipCode()" class="btn-warning">📋 نسخ الكود</button>
+            <button onclick="downloadSlipPDF()" class="btn-success">تحميل PDF</button>
+            <button onclick="closeSlip()" class="btn-danger">إغلاق</button>
+        </div>
+    </div>
+
+    <!-- نافذة فاتورة/كشف حساب العميل الشاملة -->
+    <div id="clientInvoiceModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000; padding: 20px 0;">
+        <div style="display:flex; flex-direction:column; align-items:center; max-height:90vh; overflow-y:auto; width:100%;">
+            <div class="invoice-box" id="printableClientInvoice" style="width:750px;">
+                <div class="invoice-header">
+                    <div>
+                        <h2 style="margin:0; color:#0b2545;">شركة جبال البصرة للشحن الدولي</h2>
+                        <p style="margin:5px 0; font-size:13px; color:#555;">البصرة - الجزائر | هاتف: 07885001004</p>
+                    </div>
+                    <div style="text-align: left;">
+                        <h3 style="margin:0; color:#0077b6;">كشف حساب / فاتورة شحنات</h3>
+                        <p id="clientInvDate" style="margin:5px 0; font-size:13px;"></p>
+                    </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <strong>معلومات العميل:</strong>
+                    <p id="clientInvInfo" style="margin:5px 0;"></p>
+                </div>
+                <p style="font-size:12px; color:#777; margin:0 0 10px 0;">* هذا الكشف يشمل فقط الشحنات التي تم تسليمها فعلياً إلى العميل، مع تاريخ التسليم الفعلي لكل شحنة.</p>
+                <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+                    <thead>
+                        <tr style="background:#f1f5f9;">
+                            <th style="padding:8px; border:1px solid #ddd;">كود الشحنة</th>
+                            <th style="padding:8px; border:1px solid #ddd;">تاريخ التسليم</th>
+                            <th style="padding:8px; border:1px solid #ddd;">الوزن (KG)</th>
+                            <th style="padding:8px; border:1px solid #ddd;">الحجم (CBM)</th>
+                            <th style="padding:8px; border:1px solid #ddd;">عدد المغلفات (CTN)</th>
+                            <th style="padding:8px; border:1px solid #ddd;">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientInvBody"></tbody>
+                </table>
+
+                <!-- ملخص مالي احترافي: مجمّع حسب العملة (دولار / دينار عراقي) -->
+                <div id="clientInvTotalsBox" style="border-top:2px solid #eee; padding-top:15px; margin-top:10px;"></div>
+
+                <!-- سجل الدفعات السابقة يظهر أيضاً داخل الفاتورة القابلة للطباعة/PDF -->
+                <div style="margin-top:20px;">
+                    <strong style="font-size:14px; color:var(--primary);">سجل المدفوعات:</strong>
+                    <div id="clientPaymentsHistoryPrint" style="margin-top:8px;"></div>
+                </div>
+
+                <div style="text-align:center; margin-top:30px;">
+                    <p style="font-size:12px; color:#777;">شكراً لتعاملكم مع شركة جبال البصرة (JBC). نتمنى لكم دائماً أفضل الخدمات.</p>
+                </div>
+            </div>
+
+            <!-- قسم تسجيل الدفعات: خارج صندوق الفاتورة القابل للتصدير لكي لا يظهر داخل ملف PDF بشكل مكرر -->
+            <div style="background:var(--white); width:750px; box-sizing:border-box; padding:15px 40px 20px; border-radius:0; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-top:-6px;">
+                <strong style="font-size:14px; color:var(--primary);">💰 تسجيل دفعة جديدة من العميل</strong>
+                <div style="display:flex; gap:10px; margin-top:10px; align-items:center;">
+                    <input type="number" id="newPaymentAmount" placeholder="أدخل مبلغ الدفعة..." style="flex:1;">
+                    <select id="newPaymentCurrency" style="flex:0 0 160px;">
+                        <option value="USD">دولار أمريكي ($)</option>
+                        <option value="IQD">دينار عراقي (د.ع)</option>
+                    </select>
+                    <input type="date" id="newPaymentDate" style="flex:0 0 160px;">
+                    <button onclick="addClientPayment()" class="btn-success" style="white-space:nowrap;">تسجيل الدفعة</button>
+                </div>
+                <div id="clientPaymentsHistory" style="margin-top:12px; max-height:110px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- شريط الأزرار: أصبح جزءاً ثابتاً (sticky) داخل نفس المنطقة القابلة للتمرير مع خلفية واضحة لتفادي اختفاءه -->
+            <div class="modal-footer-custom" style="position: sticky; bottom: 0; width:750px; box-sizing:border-box; z-index: 5;">
+                <button onclick="printClientInvoice()" class="btn-success">🖨️ طباعة / حفظ PDF</button>
+                <button onclick="closeClientInvoice()" class="btn-danger">إغلاق</button>
+            </div>
         </div>
     </div>
 
     <script>
         // رابط كوكل سكريبت السحابي
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnkASvAbBgkvtqrymuljfCjJCMkArDbJ9IWyx1lf4A7yM-86qoglYoeDtcsTDyH1T5OQ/exec";
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIbWopkyCRFobsBuCpbA72LOd3vAT4qb7gYd-nDKPxM8ysjSZ43G8PNca6RAEAvlG8Pg/exec";
 
         let clients = JSON.parse(localStorage.getItem('jbc_clients')) || [];
         let shipments = JSON.parse(localStorage.getItem('jbc_shipments')) || [];
@@ -377,11 +470,19 @@
             return "j" + String(num).padStart(4, '0');
         }
 
-        function generateShipRef() {
-            if (shipments.length === 0) return "jbal600";
-            let lastRef = shipments[shipments.length - 1].ref;
-            let num = parseInt(lastRef.replace(/\D/g, '')) + 1;
-            return "jbal" + num;
+        // توليد كود الشحنة تلقائياً حسب نوع الشحن المختار
+        // شحن جوي => JBC-A-26001 / شحن بحري => JBC-S-26001 (26 = آخر رقمين من السنة الحالية)
+        function generateShipRef(method) {
+            let typeLetter = method === 'شحن جوي' ? 'A' : 'S';
+            let yearSuffix = new Date().getFullYear().toString().slice(-2);
+            let prefix = `JBC-${typeLetter}-${yearSuffix}`;
+
+            let existingNums = shipments
+                .filter(s => s.ref && s.ref.startsWith(prefix))
+                .map(s => parseInt(s.ref.slice(prefix.length)) || 0);
+
+            let nextNum = existingNums.length > 0 ? Math.max(...existingNums) + 1 : 1;
+            return prefix + String(nextNum).padStart(3, '0');
         }
 
         function getFormattedToday() {
@@ -392,25 +493,109 @@
             return `${year}-${month}-${day}`;
         }
 
+        // ===================== تسجيل الدخول بالرمز السري =====================
+        // ⚠️ غيّر هذا الرمز السري إلى رمز خاص بك قبل استخدام النظام فعلياً
+        const SYSTEM_PASSWORD = "JBC@2026";
+
+        function checkExistingLogin() {
+            if (sessionStorage.getItem('jbc_authenticated') === 'true') {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('appContent').style.display = '';
+            }
+        }
+
+        function checkLogin() {
+            const input = document.getElementById('loginPasswordInput');
+            if (input.value === SYSTEM_PASSWORD) {
+                sessionStorage.setItem('jbc_authenticated', 'true');
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('appContent').style.display = '';
+                document.getElementById('loginError').style.display = 'none';
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('jbc_authenticated');
+            location.reload();
+        }
+
         window.onload = function() {
+            checkExistingLogin();
             document.getElementById('clientCode').value = generateClientCode();
-            document.getElementById('shipRef').value = generateShipRef();
+            document.getElementById('shipRef').value = generateShipRef(document.getElementById('shipMethod').value);
             document.getElementById('shipReceiveDate').value = getFormattedToday();
             renderAll();
+            flushPendingSync(); // محاولة إعادة إرسال أي بيانات لم تصل سابقاً لكوكل شيت بسبب انقطاع الاتصال
         };
 
+        // إعادة محاولة إرسال البيانات المعلّقة تلقائياً كلما عاد الاتصال بالإنترنت
+        window.addEventListener('online', flushPendingSync);
+
+        // ===================== المزامنة مع كوكل شيت (نسخة مُصلحة وأكثر موثوقية) =====================
+        // ملاحظات على الإصلاح:
+        // 1) تم تغيير "Content-Type" إلى "text/plain" بدل "application/json": في وضع fetch الـ no-cors
+        //    (وهو ضروري هنا لأن سكربت جوجل لا يُرجع صلاحيات CORS)، يقوم المتصفح بتجاهل أي Content-Type غير
+        //    مسموح به بصمت دون أي خطأ ظاهر، وهذا كان قد يسبب تعارضاً مع بعض إعدادات المتصفحات.
+        //    "text/plain" مضمونة الإرسال دائماً وهي الصيغة المعتمدة رسمياً في توثيق مشاريع Google Apps Script.
+        // 2) تمت إضافة "طابور محلي" (Pending Sync Queue): أي طلب يفشل إرساله (بسبب انقطاع الإنترنت مثلاً)
+        //    يُخزَّن في المتصفح ويُعاد إرساله تلقائياً عند إعادة تحميل الصفحة أو عودة الاتصال، بدل ضياعه نهائياً.
+        // 3) IMPORTANT: بما أن وضع "no-cors" يمنع قراءة رد الخادوم، لا يمكن لأي كود يعمل من المتصفح (هذا الملف)
+        //    أن يتأكد 100% أن جوجل شيت "استلم وحفظ" البيانات فعلياً — فقط أن الطلب "خرج" من المتصفح بدون خطأ.
+        //    إن كانت بيانات العملاء تحديداً لا تصل رغم هذا الإصلاح، فالسبب الأرجح عندها هو من جهة سكربت
+        //    Google Apps Script نفسه (الكود المنشور على script.google.com) وليس من هذه الصفحة، وغالباً بسبب:
+        //      - عدم عمل "New Deployment" بعد آخر تعديل على كود السكربت (الرابط القديم يبقى يشغّل نسخة قديمة).
+        //      - إعداد الوصول (Who has access) غير مضبوط على "Anyone".
+        //      - عدم وجود حالة/شرط (case) لمعالجة type = "client" داخل دالة doPost في السكربت.
+        //    استخدم زر "🔄 اختبار الاتصال بكوكل شيت" أدناه ثم افتح ملف الشيت للتأكد أين تحديداً تكمن المشكلة.
         async function syncToGoogleSheets(type, data) {
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("YOUR_URL")) return;
+            const payload = { type: type, data: data };
             try {
                 await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: type, data: data })
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
                 });
             } catch (error) {
-                console.error("خطأ في المزامنة السحابية:", error);
+                console.error("خطأ في المزامنة السحابية (سيُعاد المحاولة لاحقاً):", error);
+                queuePendingSync(payload);
             }
+        }
+
+        function queuePendingSync(payload) {
+            let queue = JSON.parse(localStorage.getItem('jbc_pending_sync')) || [];
+            queue.push(payload);
+            localStorage.setItem('jbc_pending_sync', JSON.stringify(queue));
+        }
+
+        async function flushPendingSync() {
+            let queue = JSON.parse(localStorage.getItem('jbc_pending_sync')) || [];
+            if (queue.length === 0) return;
+            let remaining = [];
+            for (const item of queue) {
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(item)
+                    });
+                } catch (error) {
+                    remaining.push(item); // ما زال هناك مشكلة اتصال، نحتفظ به لمحاولة لاحقة
+                }
+            }
+            localStorage.setItem('jbc_pending_sync', JSON.stringify(remaining));
+        }
+
+        // زر تشخيصي: يرسل صفاً اختبارياً إلى كوكل شيت للتأكد من أن الاتصال يعمل من عدمه
+        function testGoogleSheetSync() {
+            syncToGoogleSheets('connectionTest', { message: 'اختبار اتصال من نظام JBC', time: new Date().toLocaleString() });
+            alert('✅ تم إرسال طلب اختباري إلى كوكل شيت.\n\nافتح ملف الشيت الآن وتحقق: هل وصل صف جديد نوعه "connectionTest"؟\n\n- إذا وصل: الاتصال يعمل بشكل سليم، والمشكلة على الأرجح في جزء آخر من كود السكربت (مثلاً معالجة نوع "client" تحديداً).\n- إذا لم يصل شيء خلال دقيقة: المشكلة في رابط أو إعدادات نشر Google Apps Script نفسه، ويجب مراجعتها من هناك.');
         }
 
         function addClient() {
@@ -424,7 +609,7 @@
                 return;
             }
 
-            const newClient = { code, name, phone, address };
+            const newClient = { code, name, phone, address, payments: [] };
             clients.push(newClient);
             localStorage.setItem('jbc_clients', JSON.stringify(clients));
 
@@ -466,31 +651,50 @@
             const clientCode = document.getElementById('shipClient').value;
             const method = document.getElementById('shipMethod').value;
             const destination = document.getElementById('shipDestination').value;
-            const warehouse = document.getElementById('shipWarehouse').value.trim() || 'المخزن الرئيسي';
-            const cbm = parseFloat(document.getElementById('shipCbm').value) || 0;
-            const kg = parseFloat(document.getElementById('shipKg').value) || 0;
-            const receiveDate = document.getElementById('shipReceiveDate').value || getFormattedToday();
-            const cost = parseFloat(document.getElementById('shipCost').value) || 0;
-            const price = parseFloat(document.getElementById('shipPrice').value) || 0;
+            const warehouseRaw = document.getElementById('shipWarehouse').value.trim();
+            const cbmRaw = document.getElementById('shipCbm').value;
+            const kgRaw = document.getElementById('shipKg').value;
+            const ctnRaw = document.getElementById('shipCtn').value;
+            const receiveDate = document.getElementById('shipReceiveDate').value;
+            const costRaw = document.getElementById('shipCost').value;
+            const priceRaw = document.getElementById('shipPrice').value;
             const currency = document.getElementById('shipCurrency').value;
-            const status = document.getElementById('shipStatus').value;
+            const status = "تم الانشاء"; // حالة الشحنة تُحدد تلقائياً عند الإصدار، وتُعدَّل لاحقاً من سجل الشحنات
             const expectedArrivalDate = ''; // القيمة الافتراضية عند الإنشاء
 
-            if (!ref || !clientCode) {
-                alert("الرجاء إدخال رقم الشحنة واختيار العميل.");
-                return;
-            }
+            // ===== لا يتم إصدار أي شحنة أو توليد أي كود إلا بعد تعبئة كافة الحقول =====
+            if (!ref) { alert("⚠️ الرجاء إدخال/توليد كود الشحنة."); return; }
+            if (!clientCode) { alert("⚠️ الرجاء اختيار العميل أولاً."); return; }
+            if (!warehouseRaw) { alert("⚠️ الرجاء إدخال اسم المخزن المستلم."); return; }
+            if (!cbmRaw || parseFloat(cbmRaw) <= 0) { alert("⚠️ الرجاء إدخال حجم الشحنة (CBM)."); return; }
+            if (!kgRaw || parseFloat(kgRaw) <= 0) { alert("⚠️ الرجاء إدخال وزن الشحنة (KG)."); return; }
+            if (!ctnRaw || parseInt(ctnRaw) <= 0) { alert("⚠️ الرجاء إدخال عدد المغلفات (CTN)."); return; }
+            if (!receiveDate) { alert("⚠️ الرجاء إدخال تاريخ استلام الشحنة."); return; }
+            if (!costRaw || parseFloat(costRaw) <= 0) { alert("⚠️ الرجاء إدخال تكلفة الشحنة علينا."); return; }
+            if (!priceRaw || parseFloat(priceRaw) <= 0) { alert("⚠️ الرجاء إدخال سعر البيع للعميل."); return; }
 
-            const newShipment = { ref, clientCode, method, destination, warehouse, cbm, kg, receiveDate, cost, price, currency, status, expectedArrivalDate };
+            const warehouse = warehouseRaw;
+            const cbm = parseFloat(cbmRaw);
+            const kg = parseFloat(kgRaw);
+            const ctn = parseInt(ctnRaw);
+            const cost = parseFloat(costRaw);
+            const price = parseFloat(priceRaw);
+
+            const newShipment = { ref, clientCode, method, destination, warehouse, cbm, kg, ctn, receiveDate, cost, price, currency, status, expectedArrivalDate };
+            // توليد الكود المدمج (اسم المخزن / كود الشحنة) مباشرة عند الإصدار، ليكون جزءاً من سجل الشحنة نفسه
+            newShipment.slipCode = generateSlipCode(newShipment);
+
             shipments.push(newShipment);
             localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
 
             syncToGoogleSheets('shipment', newShipment);
 
-            document.getElementById('shipRef').value = generateShipRef();
+            document.getElementById('shipRef').value = generateShipRef(document.getElementById('shipMethod').value);
             document.getElementById('shipReceiveDate').value = getFormattedToday();
+            document.getElementById('shipWarehouse').value = '';
             document.getElementById('shipCbm').value = '';
             document.getElementById('shipKg').value = '';
+            document.getElementById('shipCtn').value = '';
             document.getElementById('shipCost').value = '';
             document.getElementById('shipPrice').value = '';
 
@@ -500,6 +704,7 @@
         
         async function updateStatus(index, newStatus) {
             let expectedArrival = shipments[index].expectedArrivalDate || '';
+            let deliveredDate = shipments[index].deliveredDate || '';
 
             // إذا تم تغيير الحالة إلى "في طور الشحن"، نطلب من المستخدم إدخال التاريخ المتوقع للوصول
             if (newStatus === "في طور الشحن") {
@@ -509,12 +714,21 @@
                 }
             }
 
+            // إذا تم تغيير الحالة إلى "تم التسليم الى العميل"، نسجل تاريخ التسليم الفعلي (يُستخدم لاحقاً في كشف حساب العميل)
+            if (newStatus === "تم التسليم الى العميل") {
+                let deliveredInput = prompt("أدخل تاريخ تسليم الشحنة الفعلي (YYYY-MM-DD):", deliveredDate || getFormattedToday());
+                if (deliveredInput !== null) {
+                    deliveredDate = deliveredInput.trim();
+                }
+            }
+
             shipments[index].status = newStatus;
             shipments[index].expectedArrivalDate = expectedArrival;
+            shipments[index].deliveredDate = deliveredDate;
             localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
             
             let shipmentRef = shipments[index].ref;
-            await syncToGoogleSheets('updateStatus', { ref: shipmentRef, status: newStatus, expectedArrivalDate: expectedArrival });
+            await syncToGoogleSheets('updateStatus', { ref: shipmentRef, status: newStatus, expectedArrivalDate: expectedArrival, deliveredDate: deliveredDate });
             
             renderAll();
         }
@@ -541,6 +755,9 @@
             let newKg = prompt("تعديل وزن الشحنة (KG):", s.kg);
             if (newKg === null) return;
 
+            let newCtn = prompt("تعديل عدد المغلفات (CTN):", s.ctn || 0);
+            if (newCtn === null) return;
+
             let newReceiveDate = prompt("تعديل تاريخ الاستلام (YYYY-MM-DD):", s.receiveDate || getFormattedToday());
             if (newReceiveDate === null) return;
 
@@ -560,10 +777,14 @@
             shipments[index].warehouse = newWarehouse.trim() || s.warehouse;
             shipments[index].cbm = parseFloat(newCbm) || s.cbm;
             shipments[index].kg = parseFloat(newKg) || s.kg;
+            shipments[index].ctn = parseInt(newCtn) || s.ctn || 0;
             shipments[index].receiveDate = newReceiveDate.trim() || s.receiveDate;
             shipments[index].expectedArrivalDate = newExpectedArrival.trim() || s.expectedArrivalDate;
             shipments[index].cost = parseFloat(newCost) || s.cost;
             shipments[index].price = parseFloat(newPrice) || s.price;
+
+            // إعادة توليد الكود المدمج بعد التعديل (لأن كود الشحنة أو اسم المخزن قد تغيّر)
+            shipments[index].slipCode = generateSlipCode(shipments[index]);
 
             localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
 
@@ -586,32 +807,222 @@
             }
         }
 
-        function openInvoice(index) {
-            let s = shipments[index];
-            let client = clients.find(c => c.code === s.clientCode) || { name: 'عميل عام', phone: '-', address: '-' };
+        // توليد الكود المدمج بصيغة (اسم المخزن / كود الشحنة)
+        function generateSlipCode(s) {
+            return (s.warehouse || "").trim() + "/" + (s.ref || "").trim();
+        }
 
-            if (s.status !== "تم التسليم الى العميل") {
-                alert("عذراً، لا يمكن إصدار الفاتورة الرسمية إلا بعد وصول الشحنة إلى مرحلة (تم التسليم الى العميل).");
+        // فتح بطاقة إصدار الشحنة (اسم المخزن / كود الشحنة) - الكود المدمج مُخزَّن أصلاً ضمن بيانات الشحنة منذ لحظة إصدارها
+        function openSlip(index) {
+            let s = shipments[index];
+
+            // احتياطي فقط للشحنات القديمة التي أُنشئت قبل إضافة هذه الميزة ولا تحتوي الحقل بعد
+            let slipCode = s.slipCode || generateSlipCode(s);
+            if (!s.slipCode) {
+                s.slipCode = slipCode;
+                localStorage.setItem('jbc_shipments', JSON.stringify(shipments));
+            }
+
+            document.getElementById('slipWarehouse').innerText = s.warehouse || '-';
+            document.getElementById('slipRef').innerText = s.ref;
+            document.getElementById('slipCode').innerText = slipCode;
+            document.getElementById('slipModal').style.display = 'flex';
+
+            // لا حاجة لأي مزامنة هنا: الكود المدمج جزء من بيانات الشحنة نفسها المُرسلة عند الإصدار أو التعديل،
+            // وهذا الزر هنا فقط لعرضه وطباعته/نسخه دون خلق صف جديد ومنفصل في جوجل شيت
+        }
+
+        // نسخ الكود المدمج (المخزن/كود الشحنة) إلى الحافظة
+        function copySlipCode() {
+            const code = document.getElementById('slipCode').innerText;
+            if (!code) return;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => {
+                    alert('✅ تم نسخ الكود: ' + code);
+                }).catch(() => {
+                    alert('تعذر النسخ تلقائياً، الكود هو: ' + code);
+                });
+            } else {
+                alert('تعذر النسخ تلقائياً، الكود هو: ' + code);
+            }
+        }
+
+        function closeSlip() {
+            document.getElementById('slipModal').style.display = 'none';
+        }
+
+        function downloadSlipPDF() {
+            const element = document.getElementById('printableSlip');
+            html2pdf().from(element).save('JBC-Slip-' + document.getElementById('slipRef').innerText + '.pdf');
+        }
+
+        // ===== كشف حساب العملاء (نسخة مصغرة): تعبئة القائمة المنسدلة لاختيار العميل =====
+        function renderClientReports() {
+            const select = document.getElementById('reportClientSelect');
+            if (!select) return;
+
+            // نحافظ على اختيار العميل الحالي إن وُجد عند إعادة الرسم
+            let previousValue = select.value;
+            select.innerHTML = '';
+
+            if (clients.length === 0) {
+                select.innerHTML = '<option value="">(لا يوجد عملاء مسجلون بعد)</option>';
                 return;
             }
 
-            document.getElementById('invDate').innerText = "التاريخ: " + new Date().toLocaleDateString();
-            document.getElementById('invClientInfo').innerHTML = `الاسم: <strong>${client.name}</strong> (${client.code})<br>الهاتف: ${client.phone}<br>العنوان: ${client.address}`;
-            document.getElementById('invRef').innerText = s.ref;
-            document.getElementById('invMethod').innerText = s.method + " - " + s.destination + " (" + s.warehouse + ")";
-            document.getElementById('invSize').innerText = s.cbm + " CBM / " + s.kg + " KG";
-            document.getElementById('invPrice').innerText = s.price.toLocaleString() + " " + s.currency;
+            clients.forEach(c => {
+                select.innerHTML += `<option value="${c.code}">${c.name} (${c.code})</option>`;
+            });
 
-            document.getElementById('invoiceModal').style.display = 'flex';
+            if (previousValue) select.value = previousValue;
         }
 
-        function closeInvoice() {
-            document.getElementById('invoiceModal').style.display = 'none';
+        function openClientInvoice(clientCode) {
+            let client = clients.find(c => c.code === clientCode);
+            if (!client) {
+                alert('يرجى اختيار عميل أولاً.');
+                return;
+            }
+
+            // كشف الحساب يعرض فقط الشحنات التي وصلت فعلياً إلى حالة "تم التسليم الى العميل"
+            let clientShipments = shipments.filter(s => s.clientCode === clientCode && s.status === 'تم التسليم الى العميل');
+
+            document.getElementById('clientInvDate').innerText = "التاريخ: " + new Date().toLocaleDateString();
+            document.getElementById('clientInvInfo').innerHTML = `الاسم: <strong>${client.name}</strong> (${client.code})<br>الهاتف: ${client.phone || '-'}<br>العنوان: ${client.address || '-'}`;
+
+            let tbody = document.getElementById('clientInvBody');
+            tbody.innerHTML = '';
+
+            // إجمالي كلف الشحنات مجمّع حسب العملة (لأن الشحنات قد تكون بالدولار أو بالدينار العراقي)
+            let costByCurrency = {};
+
+            if (clientShipments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding:10px; text-align:center; color:#777;">لا توجد شحنات تم تسليمها لهذا العميل بعد.</td></tr>';
+            } else {
+                clientShipments.forEach(s => {
+                    let cur = s.currency || 'USD';
+                    costByCurrency[cur] = (costByCurrency[cur] || 0) + (s.price || 0);
+                    tbody.innerHTML += `
+                        <tr>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:center;">${s.ref}</td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:center;">${s.deliveredDate || '-'}</td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:center;">${s.kg || 0}</td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:center;">${s.cbm || 0}</td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:center;">${s.ctn || 0}</td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:center; font-weight:bold;">${(s.price || 0).toLocaleString()} ${currencyLabel(cur)}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            // إجمالي المدفوعات مجمّع حسب العملة
+            let payments = client.payments || [];
+            let paidByCurrency = {};
+            payments.forEach(p => {
+                let cur = p.currency || 'USD';
+                paidByCurrency[cur] = (paidByCurrency[cur] || 0) + (p.amount || 0);
+            });
+
+            // بناء صندوق الملخص المالي الاحترافي، مجمّعاً حسب كل عملة ظهرت في الشحنات أو الدفعات
+            let allCurrencies = Array.from(new Set([...Object.keys(costByCurrency), ...Object.keys(paidByCurrency)]));
+            let totalsBox = document.getElementById('clientInvTotalsBox');
+            totalsBox.innerHTML = '';
+
+            if (allCurrencies.length === 0) {
+                totalsBox.innerHTML = '<p style="color:#777; font-size:13px; margin:0;">لا توجد بيانات مالية بعد لعرض الملخص.</p>';
+            } else {
+                allCurrencies.forEach(cur => {
+                    let totalCost = costByCurrency[cur] || 0;
+                    let totalPaid = paidByCurrency[cur] || 0;
+                    let remaining = totalCost - totalPaid;
+                    totalsBox.innerHTML += `
+                        <div style="background:#f8f9fa; border-radius:8px; padding:14px 18px; margin-bottom:12px;">
+                            <div style="font-size:13px; font-weight:bold; color:var(--secondary); margin-bottom:8px;">الملخص المالي (${currencyLabel(cur)})</div>
+                            <div style="display:flex; justify-content:space-between; font-size:14px; padding:4px 0;">
+                                <span>إجمالي كلف الشحنات المسلّمة:</span>
+                                <strong>${totalCost.toLocaleString()} ${currencyLabel(cur)}</strong>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:14px; padding:4px 0;">
+                                <span>إجمالي المدفوع:</span>
+                                <strong style="color:var(--success);">${totalPaid.toLocaleString()} ${currencyLabel(cur)}</strong>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:15px; padding:6px 0 0 0; border-top:1px dashed #ccc; margin-top:6px;">
+                                <span style="font-weight:bold;">المتبقي على العميل:</span>
+                                <strong style="color:var(--danger);">${remaining.toLocaleString()} ${currencyLabel(cur)}</strong>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // عرض سجل الدفعات السابقة (داخل النافذة، وأيضاً داخل نسخة الفاتورة القابلة للطباعة/PDF)
+            let historyHtml = '';
+            if (payments.length === 0) {
+                historyHtml = '<p style="color:#777; font-size:12px; margin:0;">لا توجد دفعات مسجلة لهذا العميل بعد.</p>';
+            } else {
+                payments.slice().reverse().forEach(p => {
+                    historyHtml += `<p style="margin:3px 0; font-size:12px; color:#555;">📅 ${p.date} — <strong>${(p.amount || 0).toLocaleString()} ${currencyLabel(p.currency)}</strong></p>`;
+                });
+            }
+            document.getElementById('clientPaymentsHistory').innerHTML = historyHtml;
+            document.getElementById('clientPaymentsHistoryPrint').innerHTML = historyHtml;
+
+            // نخزّن كود العميل الحالي على النافذة لاستخدامه عند تسجيل دفعة جديدة
+            document.getElementById('clientInvoiceModal').dataset.clientCode = clientCode;
+            document.getElementById('newPaymentDate').value = getFormattedToday();
+            document.getElementById('clientInvoiceModal').style.display = 'flex';
         }
 
-        function downloadPDF() {
-            const element = document.getElementById('printableInvoice');
-            html2pdf().from(element).save('JBC-Invoice.pdf');
+        // تحويل رمز العملة إلى تسمية عربية مختصرة للعرض
+        function currencyLabel(cur) {
+            return cur === 'IQD' ? 'د.ع' : '$';
+        }
+
+        // تسجيل دفعة جديدة من العميل الحالي المعروض في نافذة كشف الحساب
+        function addClientPayment() {
+            const modal = document.getElementById('clientInvoiceModal');
+            const clientCode = modal.dataset.clientCode;
+            const amountInput = document.getElementById('newPaymentAmount');
+            const currency = document.getElementById('newPaymentCurrency').value;
+            const dateInput = document.getElementById('newPaymentDate');
+            const amount = parseFloat(amountInput.value);
+            const date = dateInput.value || getFormattedToday();
+
+            if (!clientCode) {
+                alert('حدث خطأ: لم يتم تحديد العميل.');
+                return;
+            }
+            if (!amount || amount <= 0) {
+                alert('يرجى إدخال مبلغ دفعة صحيح.');
+                return;
+            }
+
+            let client = clients.find(c => c.code === clientCode);
+            if (!client) return;
+
+            if (!client.payments) client.payments = [];
+            const payment = { date: date, amount: amount, currency: currency };
+            client.payments.push(payment);
+
+            localStorage.setItem('jbc_clients', JSON.stringify(clients));
+            // يُحفظ في ورقة "المدفوعات" المخصصة داخل كوكل شيت (راجع تعليمات إعداد السكربت)
+            syncToGoogleSheets('clientPayment', { clientCode: clientCode, amount: amount, date: date, currency: currency });
+
+            amountInput.value = '';
+            openClientInvoice(clientCode); // إعادة تحميل كشف الحساب بالأرقام المحدثة
+            alert('✅ تم تسجيل الدفعة بنجاح.');
+        }
+
+        function closeClientInvoice() {
+            document.getElementById('clientInvoiceModal').style.display = 'none';
+        }
+
+        // طباعة كشف الحساب / حفظه كـ PDF باستخدام أداة الطباعة الأصلية في المتصفح
+        // (بديل موثوق 100% عن html2canvas التي لديها مشاكل معروفة مع صفحات RTL العربية وتُنتج أحياناً صفحة PDF بيضاء فارغة)
+        function printClientInvoice() {
+            window.print();
+            // من نافذة الطباعة التي ستظهر، يختار المستخدم "حفظ كـ PDF" (Save as PDF) كوجهة للطباعة للحصول على ملف PDF
         }
 
         function toggleFullTable() {
@@ -672,7 +1083,7 @@
                         <td><strong>${s.ref}</strong></td>
                         <td>${client.name}<br><small style="color:var(--accent)">${s.clientCode}</small></td>
                         <td>${s.method} (${s.destination || 'غير محدد'})<br><small>مخزن: ${s.warehouse}</small></td>
-                        <td>${s.cbm} CBM<br>${s.kg} KG</td>
+                        <td>${s.cbm} CBM<br>${s.kg} KG<br>${s.ctn || 0} CTN</td>
                         <td>استلام: ${s.receiveDate || '-'}${arrivalInfo}</td>
                         <td>
                             <select class="status-badge ${badgeClass}" onchange="updateStatus(${index}, this.value)">
@@ -684,7 +1095,8 @@
                             </select>
                         </td>
                         <td>
-                            <button class="btn-action btn-success" onclick="openInvoice(${index})">فاتورة PDF</button>
+                            <!-- زر إصدار الشحنة (بطاقة المخزن/الكود) بدل الفاتورة -->
+                            <button class="btn-action btn-success" onclick="openSlip(${index})">إصدار الشحنة</button>
                             <!-- زر تعديل الشحنة -->
                             <button class="btn-action btn-warning" onclick="editShipment(${index})">تعديل الشحنة</button>
                             <!-- زر الحذف -->
@@ -713,7 +1125,10 @@
                     `;
                 }
             }
-        }
-    </script>
+
+            renderClientReports();
+        
+    }
+</script>
 </body>
 </html>
